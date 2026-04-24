@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Shield, Bell, Save, Upload } from 'lucide-react';
+import { User, Shield, Bell, Save, Upload, Globe } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import UploadLegacyDataModal from '@/components/UploadLegacyDataModal';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES } from '@/lib/i18n';
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth();
+  const { t, i18n } = useTranslation();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,7 +43,24 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
-      <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">Settings</h1>
+      <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{t('settings.title')}</h1>
+
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <Globe className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-display font-semibold text-foreground">{t('settings.language')}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{t('settings.languageDesc')}</p>
+        <select
+          value={i18n.language}
+          onChange={(e) => i18n.changeLanguage(e.target.value)}
+          className="input-dark w-full"
+        >
+          {SUPPORTED_LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>{l.flag} {l.name}</option>
+          ))}
+        </select>
+      </div>
 
       <div className="glass-card p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
