@@ -136,6 +136,69 @@ export type Database = {
           },
         ]
       }
+      legacy_data_uploads: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          portal_username: string
+          status: string
+          transaction_count: number | null
+          uploaded_balance: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          portal_username: string
+          status?: string
+          transaction_count?: number | null
+          uploaded_balance?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          portal_username?: string
+          status?: string
+          transaction_count?: number | null
+          uploaded_balance?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      legacy_user_codes: {
+        Row: {
+          account_balance: number
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          portal_username: string
+        }
+        Insert: {
+          account_balance?: number
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          portal_username: string
+        }
+        Update: {
+          account_balance?: number
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          portal_username?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -144,7 +207,10 @@ export type Database = {
           email_alerts: boolean
           full_name: string
           id: string
+          legacy_data_uploaded: boolean
+          legacy_upload_date: string | null
           payout_alerts: boolean
+          portal_username: string | null
           two_factor_enabled: boolean
           updated_at: string
           wallet_balance: number
@@ -157,7 +223,10 @@ export type Database = {
           email_alerts?: boolean
           full_name: string
           id: string
+          legacy_data_uploaded?: boolean
+          legacy_upload_date?: string | null
           payout_alerts?: boolean
+          portal_username?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
           wallet_balance?: number
@@ -170,7 +239,10 @@ export type Database = {
           email_alerts?: boolean
           full_name?: string
           id?: string
+          legacy_data_uploaded?: boolean
+          legacy_upload_date?: string | null
           payout_alerts?: boolean
+          portal_username?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
           wallet_balance?: number
