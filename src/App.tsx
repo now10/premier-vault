@@ -3,6 +3,9 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import ForcedPopupModal from "@/components/notifications/ForcedPopupModal";
+import WithdrawalPopupModal from "@/components/notifications/WithdrawalPopupModal";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -11,6 +14,7 @@ import WithdrawalDetails from "./pages/WithdrawalDetails";
 import Transactions from "./pages/Transactions";
 import SettingsPage from "./pages/Settings";
 import Admin from "./pages/Admin";
+import NotificationsPage from "./pages/Notifications";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -20,7 +24,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <NotificationsProvider>
+      <AppLayout>{children}</AppLayout>
+      <ForcedPopupModal />
+      <WithdrawalPopupModal />
+    </NotificationsProvider>
+  );
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -44,6 +54,7 @@ const App = () => (
             <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
             <Route path="/withdrawal-details" element={<ProtectedRoute><WithdrawalDetails /></ProtectedRoute>} />
             <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
