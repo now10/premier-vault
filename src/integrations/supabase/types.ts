@@ -19,9 +19,14 @@ export type Database = {
           admin_note: string | null
           amount: number
           created_at: string
+          currency: string
+          fee: number
           id: string
+          net_amount: number | null
           payment_method: string
+          payment_method_id: string | null
           payment_reference: string | null
+          region: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["request_status"]
@@ -31,9 +36,14 @@ export type Database = {
           admin_note?: string | null
           amount: number
           created_at?: string
+          currency?: string
+          fee?: number
           id?: string
+          net_amount?: number | null
           payment_method: string
+          payment_method_id?: string | null
           payment_reference?: string | null
+          region?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["request_status"]
@@ -43,15 +53,28 @@ export type Database = {
           admin_note?: string | null
           amount?: number
           created_at?: string
+          currency?: string
+          fee?: number
           id?: string
+          net_amount?: number | null
           payment_method?: string
+          payment_method_id?: string | null
           payment_reference?: string | null
+          region?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deposit_requests_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       investment_plans: {
         Row: {
@@ -196,6 +219,137 @@ export type Database = {
           created_at?: string
           id?: string
           portal_username?: string
+        }
+        Relationships: []
+      }
+      notification_reads: {
+        Row: {
+          dismissed: boolean
+          notification_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          dismissed?: boolean
+          notification_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          dismissed?: boolean
+          notification_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          force_popup: boolean
+          id: string
+          link: string | null
+          message: string
+          read: boolean
+          related_request_id: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          force_popup?: boolean
+          id?: string
+          link?: string | null
+          message: string
+          read?: boolean
+          related_request_id?: string | null
+          title: string
+          type?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          force_popup?: boolean
+          id?: string
+          link?: string | null
+          message?: string
+          read?: boolean
+          related_request_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          currency: string
+          direction: string
+          display_name: string
+          display_order: number
+          fee_flat: number
+          fee_percent: number
+          id: string
+          instructions: string | null
+          max_amount: number | null
+          min_amount: number
+          processing_time: string | null
+          region: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          currency: string
+          direction?: string
+          display_name: string
+          display_order?: number
+          fee_flat?: number
+          fee_percent?: number
+          id?: string
+          instructions?: string | null
+          max_amount?: number | null
+          min_amount?: number
+          processing_time?: string | null
+          region: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          currency?: string
+          direction?: string
+          display_name?: string
+          display_order?: number
+          fee_flat?: number
+          fee_percent?: number
+          id?: string
+          instructions?: string | null
+          max_amount?: number | null
+          min_amount?: number
+          processing_time?: string | null
+          region?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -385,14 +539,64 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_popups: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          message: string
+          required_fee: number | null
+          title: string
+          user_id: string
+          withdrawal_request_id: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message: string
+          required_fee?: number | null
+          title: string
+          user_id: string
+          withdrawal_request_id: string
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string
+          required_fee?: number | null
+          title?: string
+          user_id?: string
+          withdrawal_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_popups_withdrawal_request_id_fkey"
+            columns: ["withdrawal_request_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       withdrawal_requests: {
         Row: {
           admin_note: string | null
           amount: number
           created_at: string
+          currency: string
           fee: number
           id: string
           net_amount: number
+          payment_method_id: string | null
+          region: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["request_status"]
@@ -403,9 +607,12 @@ export type Database = {
           admin_note?: string | null
           amount: number
           created_at?: string
+          currency?: string
           fee: number
           id?: string
           net_amount: number
+          payment_method_id?: string | null
+          region?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["request_status"]
@@ -416,16 +623,27 @@ export type Database = {
           admin_note?: string | null
           amount?: number
           created_at?: string
+          currency?: string
           fee?: number
           id?: string
           net_amount?: number
+          payment_method_id?: string | null
+          region?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           user_id?: string
           withdrawal_details_snapshot?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
