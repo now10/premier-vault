@@ -86,9 +86,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground">Balance</p>
               <p className="text-sm font-bold gradient-gold-text">${Number(profile?.wallet_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
             </div>
-            <button className="relative text-muted-foreground hover:text-foreground">
-              <Bell className="w-5 h-5" />
-            </button>
+            <LanguageSwitcher />
+            <NotificationsBell />
             <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-primary-foreground font-bold text-sm">
               {profile?.full_name?.charAt(0).toUpperCase()}
             </div>
