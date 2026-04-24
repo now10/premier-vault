@@ -1,25 +1,29 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import NotificationsBell from '@/components/notifications/NotificationsBell';
 import {
-  LayoutDashboard, TrendingUp, CreditCard, History, Settings, LogOut, Menu, Bell, ShieldCheck,
+  LayoutDashboard, TrendingUp, CreditCard, History, Settings, LogOut, Menu, ShieldCheck,
 } from 'lucide-react';
-
-const baseNavItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/investments', icon: TrendingUp, label: 'Investment Plans' },
-  { to: '/withdrawal-details', icon: CreditCard, label: 'Withdrawal Details' },
-  { to: '/transactions', icon: History, label: 'Transactions' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const baseNavItems = [
+    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/investments', icon: TrendingUp, label: t('nav.investments') },
+    { to: '/withdrawal-details', icon: CreditCard, label: t('nav.withdrawalDetails') },
+    { to: '/transactions', icon: History, label: t('nav.transactions') },
+    { to: '/settings', icon: Settings, label: t('nav.settings') },
+  ];
+
   const navItems = isAdmin
-    ? [...baseNavItems, { to: '/admin', icon: ShieldCheck, label: 'Admin Panel' }]
+    ? [...baseNavItems, { to: '/admin', icon: ShieldCheck, label: t('nav.admin') }]
     : baseNavItems;
 
   const handleLogout = async () => {
