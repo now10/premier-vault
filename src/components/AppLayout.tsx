@@ -65,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-sidebar-border">
           <button onClick={handleLogout} className="sidebar-link w-full text-destructive hover:text-destructive hover:bg-destructive/10">
             <LogOut className="w-5 h-5" />
-            Logout
+            {t('nav.logout')}
           </button>
         </div>
       </aside>
@@ -77,13 +77,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Menu className="w-6 h-6" />
             </button>
             <div>
-              <p className="text-sm text-muted-foreground">Welcome back,</p>
+              <p className="text-sm text-muted-foreground">{t('nav.welcome')}</p>
               <p className="text-sm font-semibold text-foreground">{profile?.full_name}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden sm:block text-right">
-              <p className="text-xs text-muted-foreground">Balance</p>
+              <p className="text-xs text-muted-foreground">{t('nav.balance')}</p>
               <p className="text-sm font-bold gradient-gold-text">${Number(profile?.wallet_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
             </div>
             <LanguageSwitcher />
