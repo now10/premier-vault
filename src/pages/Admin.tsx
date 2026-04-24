@@ -1,32 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { ShieldCheck, Check, X, Clock, Users } from 'lucide-react';
+import { ShieldCheck, Check, X, Clock, Users, Bell, MessageSquareWarning, Wallet, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { generateRef } from '@/lib/api';
+import { sendNotification, type PaymentMethod } from '@/lib/notifications';
+import { useTranslation } from 'react-i18next';
 
-type Tab = 'deposits' | 'withdrawals';
+type Tab = 'deposits' | 'withdrawals' | 'notifications' | 'popups' | 'methods';
 
 export default function Admin() {
   const { user, isAdmin, isLoading } = useAuth();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('deposits');
   const [deposits, setDeposits] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState<'Pending' | 'Approved' | 'Rejected' | 'All'>('Pending');
 
+  // Notification composer state
+  const [notifTarget, setNotifTarget] = useState<'all' | 'user'>('all');
+  const [notifUserId, setNotifUserId] = useState<string>('');
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifType, setNotifType] = useState<'info' | 'success' | 'warning' | 'error'>('info');
+  const [notifForcePopup, setNotifForcePopup] = useState(false);
+
+  // Popup composer state
+  const [popupWithdrawalId, setPopupWithdrawalId] = useState<string>('');
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupFee, setPopupFee] = useState<string>('');
+
   const loadData = async () => {
-    const [d, w, p] = await Promise.all([
+    const [d, w, p, m] = await Promise.all([
       supabase.from('deposit_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('withdrawal_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, full_name, email, wallet_balance'),
+      supabase.from('payment_methods').select('*').order('display_order'),
     ]);
     setDeposits(d.data || []);
     setWithdrawals(w.data || []);
+    setProfiles(p.data || []);
+    setMethods((m.data || []) as any);
     const map: Record<string, any> = {};
-    (p.data || []).forEach(prof => { map[prof.id] = prof; });
+    (p.data || []).forEach((prof) => { map[prof.id] = prof; });
     setProfilesMap(map);
   };
 
@@ -39,12 +60,20 @@ export default function Admin() {
     setBusy(req.id);
     const prof = profilesMap[req.user_id];
     if (!prof) { setBusy(null); return; }
-
-    await supabase.from('profiles').update({ wallet_balance: Number(prof.wallet_balance) + Number(req.amount) }).eq('id', req.user_id);
+    const credit = Number(req.net_amount ?? req.amount);
+    await supabase.from('profiles').update({ wallet_balance: Number(prof.wallet_balance) + credit }).eq('id', req.user_id);
     await supabase.from('deposit_requests').update({ status: 'Approved', reviewed_at: new Date().toISOString(), reviewed_by: user!.id }).eq('id', req.id);
-    await supabase.from('transactions').update({ status: 'Completed', description: `Deposit via ${req.payment_method} (approved)` }).eq('related_request_id', req.id);
-
-    toast({ title: '✅ Deposit Approved', description: `Credited $${Number(req.amount).toLocaleString()} to ${prof.full_name}` });
+    await supabase.from('transactions').update({ status: 'Completed', description: `Deposit via ${req.payment_method} approved` }).eq('related_request_id', req.id);
+    await sendNotification({
+      userId: req.user_id,
+      title: 'Deposit Approved',
+      message: `Your deposit of ${credit.toLocaleString()} ${req.currency || 'USD'} has been credited to your wallet.`,
+      type: 'success',
+      link: '/transactions',
+      relatedRequestId: req.id,
+      createdBy: user!.id,
+    });
+    toast({ title: '✅ Deposit Approved' });
     await loadData();
     setBusy(null);
   };
@@ -53,6 +82,15 @@ export default function Admin() {
     setBusy(req.id);
     await supabase.from('deposit_requests').update({ status: 'Rejected', reviewed_at: new Date().toISOString(), reviewed_by: user!.id, admin_note: note }).eq('id', req.id);
     await supabase.from('transactions').update({ status: 'Rejected', description: `Deposit rejected: ${note}` }).eq('related_request_id', req.id);
+    await sendNotification({
+      userId: req.user_id,
+      title: 'Deposit Rejected',
+      message: `Your deposit was rejected. Reason: ${note}`,
+      type: 'error',
+      link: '/transactions',
+      relatedRequestId: req.id,
+      createdBy: user!.id,
+    });
     toast({ title: 'Deposit Rejected' });
     await loadData();
     setBusy(null);
@@ -60,9 +98,17 @@ export default function Admin() {
 
   const approveWithdrawal = async (req: any) => {
     setBusy(req.id);
-    // Balance was already deducted at request time
     await supabase.from('withdrawal_requests').update({ status: 'Approved', reviewed_at: new Date().toISOString(), reviewed_by: user!.id }).eq('id', req.id);
     await supabase.from('transactions').update({ status: 'Completed', description: 'Withdrawal approved & processed' }).eq('related_request_id', req.id);
+    await sendNotification({
+      userId: req.user_id,
+      title: 'Withdrawal Approved',
+      message: `Your withdrawal of ${Number(req.net_amount).toLocaleString()} ${req.currency || 'USD'} has been processed.`,
+      type: 'success',
+      link: '/transactions',
+      relatedRequestId: req.id,
+      createdBy: user!.id,
+    });
     toast({ title: '✅ Withdrawal Approved' });
     await loadData();
     setBusy(null);
@@ -71,67 +117,120 @@ export default function Admin() {
   const rejectWithdrawal = async (req: any, note: string) => {
     setBusy(req.id);
     const prof = profilesMap[req.user_id];
-    // Refund the balance
     if (prof) {
       await supabase.from('profiles').update({ wallet_balance: Number(prof.wallet_balance) + Number(req.amount) }).eq('id', req.user_id);
     }
     await supabase.from('withdrawal_requests').update({ status: 'Rejected', reviewed_at: new Date().toISOString(), reviewed_by: user!.id, admin_note: note }).eq('id', req.id);
     await supabase.from('transactions').update({ status: 'Rejected', description: `Withdrawal rejected: ${note}` }).eq('related_request_id', req.id);
-    toast({ title: 'Withdrawal Rejected', description: 'Funds refunded to user.' });
+    await sendNotification({
+      userId: req.user_id,
+      title: 'Withdrawal Rejected',
+      message: `Your withdrawal was rejected and the funds returned to your wallet. Reason: ${note}`,
+      type: 'error',
+      link: '/transactions',
+      relatedRequestId: req.id,
+      createdBy: user!.id,
+    });
+    toast({ title: 'Withdrawal Rejected' });
     await loadData();
     setBusy(null);
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      toast({ title: 'Missing fields', description: 'Title and message are required.', variant: 'destructive' });
+      return;
+    }
+    if (notifTarget === 'user' && !notifUserId) {
+      toast({ title: 'Pick a user', variant: 'destructive' });
+      return;
+    }
+    const { error } = await sendNotification({
+      userId: notifTarget === 'all' ? null : notifUserId,
+      title: notifTitle.trim(),
+      message: notifMessage.trim(),
+      type: notifType,
+      forcePopup: notifForcePopup,
+      createdBy: user!.id,
+    });
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    setNotifTitle(''); setNotifMessage(''); setNotifForcePopup(false);
+    toast({ title: '✅ ' + t('notifications.sent') });
+  };
+
+  const handleCreatePopup = async () => {
+    if (!popupWithdrawalId || !popupTitle.trim() || !popupMessage.trim()) {
+      toast({ title: 'Missing fields', variant: 'destructive' });
+      return;
+    }
+    const w = withdrawals.find((x) => x.id === popupWithdrawalId);
+    if (!w) return;
+    const { error } = await supabase.from('withdrawal_popups').insert({
+      withdrawal_request_id: popupWithdrawalId,
+      user_id: w.user_id,
+      title: popupTitle.trim(),
+      message: popupMessage.trim(),
+      required_fee: popupFee ? Number(popupFee) : null,
+      created_by: user!.id,
+    });
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    setPopupTitle(''); setPopupMessage(''); setPopupFee(''); setPopupWithdrawalId('');
+    toast({ title: '✅ ' + t('admin.popupSent') });
+  };
+
+  const updateMethod = async (id: string, patch: Partial<PaymentMethod>) => {
+    const { error } = await supabase.from('payment_methods').update(patch as any).eq('id', id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    await loadData();
   };
 
   const filteredDeposits = deposits.filter(d => filter === 'All' || d.status === filter);
   const filteredWithdrawals = withdrawals.filter(w => filter === 'All' || w.status === filter);
   const pendingDepositsCount = deposits.filter(d => d.status === 'Pending').length;
   const pendingWithdrawalsCount = withdrawals.filter(w => w.status === 'Pending').length;
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending');
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-7 h-7 text-primary" />
-        <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">Admin Panel</h1>
+        <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{t('admin.panel')}</h1>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Pending Deposits</span>
-            <Clock className="w-4 h-4 text-warning" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{pendingDepositsCount}</p>
-        </div>
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Pending Withdrawals</span>
-            <Clock className="w-4 h-4 text-warning" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{pendingWithdrawalsCount}</p>
-        </div>
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Total Users</span>
-            <Users className="w-4 h-4 text-primary" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{Object.keys(profilesMap).length}</p>
-        </div>
+        <div className="glass-card p-5"><div className="flex items-center justify-between mb-2"><span className="text-sm text-muted-foreground">{t('admin.pendingDeposits')}</span><Clock className="w-4 h-4 text-warning" /></div><p className="text-2xl font-bold text-foreground">{pendingDepositsCount}</p></div>
+        <div className="glass-card p-5"><div className="flex items-center justify-between mb-2"><span className="text-sm text-muted-foreground">{t('admin.pendingWithdrawals')}</span><Clock className="w-4 h-4 text-warning" /></div><p className="text-2xl font-bold text-foreground">{pendingWithdrawalsCount}</p></div>
+        <div className="glass-card p-5"><div className="flex items-center justify-between mb-2"><span className="text-sm text-muted-foreground">{t('admin.totalUsers')}</span><Users className="w-4 h-4 text-primary" /></div><p className="text-2xl font-bold text-foreground">{profiles.length}</p></div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setTab('deposits')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'deposits' ? 'gradient-gold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-          Deposits ({pendingDepositsCount})
-        </button>
-        <button onClick={() => setTab('withdrawals')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'withdrawals' ? 'gradient-gold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-          Withdrawals ({pendingWithdrawalsCount})
-        </button>
-        <div className="flex-1" />
-        <select value={filter} onChange={e => setFilter(e.target.value as any)} className="input-dark py-2 text-sm">
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
-          <option value="All">All</option>
-        </select>
+      <div className="flex gap-2 flex-wrap items-center">
+        {([
+          ['deposits', t('admin.tabs.deposits'), Wallet],
+          ['withdrawals', t('admin.tabs.withdrawals'), Send],
+          ['notifications', t('admin.tabs.notifications'), Bell],
+          ['popups', t('admin.tabs.popups'), MessageSquareWarning],
+          ['methods', t('admin.tabs.methods'), ShieldCheck],
+        ] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${tab === key ? 'gradient-gold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+        {(tab === 'deposits' || tab === 'withdrawals') && (
+          <>
+            <div className="flex-1" />
+            <select value={filter} onChange={e => setFilter(e.target.value as any)} className="input-dark py-2 text-sm">
+              <option value="Pending">{t('common.pending')}</option>
+              <option value="Approved">{t('common.approved')}</option>
+              <option value="Rejected">{t('common.rejected')}</option>
+              <option value="All">{t('common.all')}</option>
+            </select>
+          </>
+        )}
       </div>
 
       {tab === 'deposits' && (
@@ -143,13 +242,12 @@ export default function Admin() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-muted-foreground bg-muted/30">
-                    <th className="text-left py-3 px-4">Date</th>
-                    <th className="text-left py-3 px-4">User</th>
-                    <th className="text-right py-3 px-4">Amount</th>
-                    <th className="text-left py-3 px-4">Method</th>
-                    <th className="text-left py-3 px-4">Reference</th>
-                    <th className="text-left py-3 px-4">Status</th>
-                    <th className="text-right py-3 px-4">Actions</th>
+                    <th className="text-left py-3 px-4">{t('common.date')}</th>
+                    <th className="text-left py-3 px-4">{t('common.user')}</th>
+                    <th className="text-right py-3 px-4">{t('common.amount')}</th>
+                    <th className="text-left py-3 px-4">{t('common.method')}</th>
+                    <th className="text-left py-3 px-4">{t('common.status')}</th>
+                    <th className="text-right py-3 px-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -159,25 +257,15 @@ export default function Admin() {
                     return (
                       <tr key={d.id} className="border-b border-border/50">
                         <td className="py-3 px-4 text-muted-foreground">{new Date(d.created_at).toLocaleDateString()}</td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <p className="text-foreground">{prof?.full_name || '—'}</p>
-                            <p className="text-xs text-muted-foreground">{prof?.email}</p>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-success">${Number(d.amount).toLocaleString()}</td>
+                        <td className="py-3 px-4"><p className="text-foreground">{prof?.full_name || '—'}</p><p className="text-xs text-muted-foreground">{prof?.email}</p></td>
+                        <td className="py-3 px-4 text-right font-medium text-success">{Number(d.amount).toLocaleString()} {d.currency || 'USD'}</td>
                         <td className="py-3 px-4 text-muted-foreground capitalize">{d.payment_method}</td>
-                        <td className="py-3 px-4 text-muted-foreground text-xs">{d.payment_reference || '—'}</td>
                         <td className="py-3 px-4"><span className={badge}>{d.status}</span></td>
                         <td className="py-3 px-4 text-right">
                           {d.status === 'Pending' && (
                             <div className="flex gap-2 justify-end">
-                              <button onClick={() => approveDeposit(d)} disabled={busy === d.id} className="px-3 py-1 rounded bg-success/20 text-success text-xs font-medium hover:bg-success/30">
-                                <Check className="w-3 h-3 inline mr-1" />Approve
-                              </button>
-                              <button onClick={() => { const n = prompt('Reason for rejection:') || 'Rejected by admin'; rejectDeposit(d, n); }} disabled={busy === d.id} className="px-3 py-1 rounded bg-destructive/20 text-destructive text-xs font-medium hover:bg-destructive/30">
-                                <X className="w-3 h-3 inline mr-1" />Reject
-                              </button>
+                              <button onClick={() => approveDeposit(d)} disabled={busy === d.id} className="px-3 py-1 rounded bg-success/20 text-success text-xs font-medium hover:bg-success/30"><Check className="w-3 h-3 inline mr-1" />{t('common.approve')}</button>
+                              <button onClick={() => { const n = prompt('Reason for rejection:') || 'Rejected by admin'; rejectDeposit(d, n); }} disabled={busy === d.id} className="px-3 py-1 rounded bg-destructive/20 text-destructive text-xs font-medium hover:bg-destructive/30"><X className="w-3 h-3 inline mr-1" />{t('common.reject')}</button>
                             </div>
                           )}
                         </td>
@@ -200,43 +288,33 @@ export default function Admin() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-muted-foreground bg-muted/30">
-                    <th className="text-left py-3 px-4">Date</th>
-                    <th className="text-left py-3 px-4">User</th>
-                    <th className="text-right py-3 px-4">Amount</th>
-                    <th className="text-right py-3 px-4">Net</th>
-                    <th className="text-left py-3 px-4">Destination</th>
-                    <th className="text-left py-3 px-4">Status</th>
-                    <th className="text-right py-3 px-4">Actions</th>
+                    <th className="text-left py-3 px-4">{t('common.date')}</th>
+                    <th className="text-left py-3 px-4">{t('common.user')}</th>
+                    <th className="text-right py-3 px-4">{t('common.amount')}</th>
+                    <th className="text-right py-3 px-4">{t('common.net')}</th>
+                    <th className="text-left py-3 px-4">{t('common.method')}</th>
+                    <th className="text-left py-3 px-4">{t('common.status')}</th>
+                    <th className="text-right py-3 px-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredWithdrawals.map(w => {
                     const prof = profilesMap[w.user_id];
                     const snap: any = w.withdrawal_details_snapshot;
-                    const dest = snap?.method === 'bank'
-                      ? `${snap.bank_name} ****${snap.account_number?.slice(-4)}`
-                      : `${snap?.network} ${snap?.wallet_address?.slice(0, 8)}...`;
                     const badge = w.status === 'Pending' ? 'badge-pending' : w.status === 'Approved' ? 'badge-completed' : 'stat-badge bg-destructive/20 text-destructive';
                     return (
                       <tr key={w.id} className="border-b border-border/50">
                         <td className="py-3 px-4 text-muted-foreground">{new Date(w.created_at).toLocaleDateString()}</td>
-                        <td className="py-3 px-4">
-                          <p className="text-foreground">{prof?.full_name || '—'}</p>
-                          <p className="text-xs text-muted-foreground">{prof?.email}</p>
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-destructive">${Number(w.amount).toLocaleString()}</td>
-                        <td className="py-3 px-4 text-right text-foreground">${Number(w.net_amount).toFixed(2)}</td>
-                        <td className="py-3 px-4 text-muted-foreground text-xs">{dest}</td>
+                        <td className="py-3 px-4"><p className="text-foreground">{prof?.full_name || '—'}</p><p className="text-xs text-muted-foreground">{prof?.email}</p></td>
+                        <td className="py-3 px-4 text-right font-medium text-destructive">{Number(w.amount).toLocaleString()} {w.currency || 'USD'}</td>
+                        <td className="py-3 px-4 text-right text-foreground">{Number(w.net_amount).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-muted-foreground text-xs">{snap?.payment_method || snap?.method || '—'}</td>
                         <td className="py-3 px-4"><span className={badge}>{w.status}</span></td>
                         <td className="py-3 px-4 text-right">
                           {w.status === 'Pending' && (
                             <div className="flex gap-2 justify-end">
-                              <button onClick={() => approveWithdrawal(w)} disabled={busy === w.id} className="px-3 py-1 rounded bg-success/20 text-success text-xs font-medium hover:bg-success/30">
-                                <Check className="w-3 h-3 inline mr-1" />Approve
-                              </button>
-                              <button onClick={() => { const n = prompt('Reason for rejection:') || 'Rejected by admin'; rejectWithdrawal(w, n); }} disabled={busy === w.id} className="px-3 py-1 rounded bg-destructive/20 text-destructive text-xs font-medium hover:bg-destructive/30">
-                                <X className="w-3 h-3 inline mr-1" />Reject
-                              </button>
+                              <button onClick={() => approveWithdrawal(w)} disabled={busy === w.id} className="px-3 py-1 rounded bg-success/20 text-success text-xs font-medium hover:bg-success/30"><Check className="w-3 h-3 inline mr-1" />{t('common.approve')}</button>
+                              <button onClick={() => { const n = prompt('Reason for rejection:') || 'Rejected by admin'; rejectWithdrawal(w, n); }} disabled={busy === w.id} className="px-3 py-1 rounded bg-destructive/20 text-destructive text-xs font-medium hover:bg-destructive/30"><X className="w-3 h-3 inline mr-1" />{t('common.reject')}</button>
                             </div>
                           )}
                         </td>
@@ -247,6 +325,154 @@ export default function Admin() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'notifications' && (
+        <div className="glass-card p-6 space-y-4 max-w-2xl">
+          <h2 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            {t('notifications.compose')}
+          </h2>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">{t('notifications.target')}</label>
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => setNotifTarget('all')} className={`px-3 py-2 rounded-md text-sm border ${notifTarget === 'all' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>{t('notifications.allUsers')}</button>
+              <button onClick={() => setNotifTarget('user')} className={`px-3 py-2 rounded-md text-sm border ${notifTarget === 'user' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>{t('notifications.specificUser')}</button>
+            </div>
+            {notifTarget === 'user' && (
+              <select value={notifUserId} onChange={(e) => setNotifUserId(e.target.value)} className="input-dark w-full">
+                <option value="">— select user —</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name} ({p.email})</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('notifications.messageTitle')}</label>
+            <input type="text" value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} className="input-dark w-full" maxLength={100} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('notifications.messageBody')}</label>
+            <textarea value={notifMessage} onChange={(e) => setNotifMessage(e.target.value)} className="input-dark w-full min-h-[100px]" maxLength={1000} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('notifications.type')}</label>
+            <select value={notifType} onChange={(e) => setNotifType(e.target.value as any)} className="input-dark w-full">
+              <option value="info">Info</option>
+              <option value="success">Success</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+            <input type="checkbox" checked={notifForcePopup} onChange={(e) => setNotifForcePopup(e.target.checked)} />
+            {t('notifications.forcePopup')}
+          </label>
+
+          <button onClick={handleSendNotification} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Send className="w-4 h-4" />
+            {t('notifications.send')}
+          </button>
+        </div>
+      )}
+
+      {tab === 'popups' && (
+        <div className="glass-card p-6 space-y-4 max-w-2xl">
+          <h2 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
+            <MessageSquareWarning className="w-5 h-5 text-warning" />
+            {t('admin.composePopupTitle')}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t('admin.composePopupBody')}</p>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('admin.selectWithdrawal')}</label>
+            <select value={popupWithdrawalId} onChange={(e) => setPopupWithdrawalId(e.target.value)} className="input-dark w-full">
+              <option value="">— select —</option>
+              {pendingWithdrawals.map((w) => {
+                const prof = profilesMap[w.user_id];
+                return (
+                  <option key={w.id} value={w.id}>
+                    {prof?.full_name || w.user_id} — {Number(w.amount).toLocaleString()} {w.currency || 'USD'} ({new Date(w.created_at).toLocaleDateString()})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('notifications.messageTitle')}</label>
+            <input type="text" value={popupTitle} onChange={(e) => setPopupTitle(e.target.value)} className="input-dark w-full" maxLength={100} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('notifications.messageBody')}</label>
+            <textarea value={popupMessage} onChange={(e) => setPopupMessage(e.target.value)} className="input-dark w-full min-h-[100px]" maxLength={1000} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('admin.requiredFee')}</label>
+            <input type="number" value={popupFee} onChange={(e) => setPopupFee(e.target.value)} className="input-dark w-full" />
+          </div>
+
+          <button onClick={handleCreatePopup} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Send className="w-4 h-4" />
+            {t('common.send')}
+          </button>
+        </div>
+      )}
+
+      {tab === 'methods' && (
+        <div className="glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground bg-muted/30">
+                  <th className="text-left py-3 px-4">Method</th>
+                  <th className="text-left py-3 px-4">Region</th>
+                  <th className="text-left py-3 px-4">Currency</th>
+                  <th className="text-right py-3 px-4">Fee %</th>
+                  <th className="text-right py-3 px-4">Fee Flat</th>
+                  <th className="text-right py-3 px-4">Min</th>
+                  <th className="text-right py-3 px-4">Max</th>
+                  <th className="text-center py-3 px-4">Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {methods.map((m) => (
+                  <tr key={m.id} className="border-b border-border/50">
+                    <td className="py-3 px-4">
+                      <p className="text-foreground">{m.display_name}</p>
+                      <p className="text-xs text-muted-foreground">{m.code}</p>
+                    </td>
+                    <td className="py-3 px-4 text-muted-foreground">{m.region}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{m.currency}</td>
+                    <td className="py-3 px-4 text-right">
+                      <input type="number" defaultValue={m.fee_percent} onBlur={(e) => updateMethod(m.id, { fee_percent: Number(e.target.value) })} className="input-dark w-20 text-right py-1" step="0.01" />
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <input type="number" defaultValue={m.fee_flat} onBlur={(e) => updateMethod(m.id, { fee_flat: Number(e.target.value) })} className="input-dark w-20 text-right py-1" step="0.01" />
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <input type="number" defaultValue={m.min_amount} onBlur={(e) => updateMethod(m.id, { min_amount: Number(e.target.value) })} className="input-dark w-24 text-right py-1" />
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <input type="number" defaultValue={m.max_amount ?? ''} onBlur={(e) => updateMethod(m.id, { max_amount: e.target.value ? Number(e.target.value) : null })} className="input-dark w-28 text-right py-1" />
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <input type="checkbox" defaultChecked={m.active} onChange={(e) => updateMethod(m.id, { active: e.target.checked })} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

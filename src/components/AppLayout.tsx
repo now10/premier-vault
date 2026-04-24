@@ -1,25 +1,29 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import NotificationsBell from '@/components/notifications/NotificationsBell';
 import {
-  LayoutDashboard, TrendingUp, CreditCard, History, Settings, LogOut, Menu, Bell, ShieldCheck,
+  LayoutDashboard, TrendingUp, CreditCard, History, Settings, LogOut, Menu, ShieldCheck,
 } from 'lucide-react';
-
-const baseNavItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/investments', icon: TrendingUp, label: 'Investment Plans' },
-  { to: '/withdrawal-details', icon: CreditCard, label: 'Withdrawal Details' },
-  { to: '/transactions', icon: History, label: 'Transactions' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const baseNavItems = [
+    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/investments', icon: TrendingUp, label: t('nav.investments') },
+    { to: '/withdrawal-details', icon: CreditCard, label: t('nav.withdrawalDetails') },
+    { to: '/transactions', icon: History, label: t('nav.transactions') },
+    { to: '/settings', icon: Settings, label: t('nav.settings') },
+  ];
+
   const navItems = isAdmin
-    ? [...baseNavItems, { to: '/admin', icon: ShieldCheck, label: 'Admin Panel' }]
+    ? [...baseNavItems, { to: '/admin', icon: ShieldCheck, label: t('nav.admin') }]
     : baseNavItems;
 
   const handleLogout = async () => {
@@ -61,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-sidebar-border">
           <button onClick={handleLogout} className="sidebar-link w-full text-destructive hover:text-destructive hover:bg-destructive/10">
             <LogOut className="w-5 h-5" />
-            Logout
+            {t('nav.logout')}
           </button>
         </div>
       </aside>
@@ -73,18 +77,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Menu className="w-6 h-6" />
             </button>
             <div>
-              <p className="text-sm text-muted-foreground">Welcome back,</p>
+              <p className="text-sm text-muted-foreground">{t('nav.welcome')}</p>
               <p className="text-sm font-semibold text-foreground">{profile?.full_name}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden sm:block text-right">
-              <p className="text-xs text-muted-foreground">Balance</p>
+              <p className="text-xs text-muted-foreground">{t('nav.balance')}</p>
               <p className="text-sm font-bold gradient-gold-text">${Number(profile?.wallet_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
             </div>
-            <button className="relative text-muted-foreground hover:text-foreground">
-              <Bell className="w-5 h-5" />
-            </button>
+            <LanguageSwitcher />
+            <NotificationsBell />
             <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-primary-foreground font-bold text-sm">
               {profile?.full_name?.charAt(0).toUpperCase()}
             </div>
