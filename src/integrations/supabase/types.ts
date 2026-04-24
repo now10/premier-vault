@@ -494,6 +494,168 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_messages: {
+        Row: {
+          id: string
+          title: string
+          message: string
+          target: Database["public"]["Enums"]["message_target"]
+          target_user_id: string | null
+          auto_clear_seconds: number | null
+          has_button: boolean
+          button_text: string | null
+          button_action: string | null
+          sent_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          message: string
+          target?: Database["public"]["Enums"]["message_target"]
+          target_user_id?: string | null
+          auto_clear_seconds?: number | null
+          has_button?: boolean
+          button_text?: string | null
+          button_action?: string | null
+          sent_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          message?: string
+          target?: Database["public"]["Enums"]["message_target"]
+          target_user_id?: string | null
+          auto_clear_seconds?: number | null
+          has_button?: boolean
+          button_text?: string | null
+          button_action?: string | null
+          sent_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      bonuses: {
+        Row: {
+          id: string
+          type: Database["public"]["Enums"]["bonus_type"]
+          amount: number | null
+          description: string
+          target: Database["public"]["Enums"]["message_target"]
+          target_user_id: string | null
+          expiry_days: number | null
+          require_confirmation: boolean
+          code: string | null
+          sent_by: string
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          type: Database["public"]["Enums"]["bonus_type"]
+          amount?: number | null
+          description: string
+          target?: Database["public"]["Enums"]["message_target"]
+          target_user_id?: string | null
+          expiry_days?: number | null
+          require_confirmation?: boolean
+          code?: string | null
+          sent_by: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          type?: Database["public"]["Enums"]["bonus_type"]
+          amount?: number | null
+          description?: string
+          target?: Database["public"]["Enums"]["message_target"]
+          target_user_id?: string | null
+          expiry_days?: number | null
+          require_confirmation?: boolean
+          code?: string | null
+          sent_by?: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Relationships: []
+      }
+      fines: {
+        Row: {
+          id: string
+          type: Database["public"]["Enums"]["fine_type"]
+          amount: number
+          reason: string
+          target_user_id: string
+          require_payment: boolean
+          paid: boolean
+          sent_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          type: Database["public"]["Enums"]["fine_type"]
+          amount: number
+          reason: string
+          target_user_id: string
+          require_payment?: boolean
+          paid?: boolean
+          sent_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          type?: Database["public"]["Enums"]["fine_type"]
+          amount?: number
+          reason?: string
+          target_user_id?: string
+          require_payment?: boolean
+          paid?: boolean
+          sent_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      approval_requests: {
+        Row: {
+          id: string
+          purpose: string
+          target_user_id: string
+          input_type: Database["public"]["Enums"]["input_type"]
+          user_input: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          admin_response: string | null
+          sent_by: string
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          purpose: string
+          target_user_id: string
+          input_type: Database["public"]["Enums"]["input_type"]
+          user_input?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          admin_response?: string | null
+          sent_by: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          purpose?: string
+          target_user_id?: string
+          input_type?: Database["public"]["Enums"]["input_type"]
+          user_input?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          admin_response?: string | null
+          sent_by?: string
+          created_at?: string
+          responded_at?: string | null
+        }
+        Relationships: []
+      }
       withdrawal_details: {
         Row: {
           account_name: string | null
@@ -665,6 +827,11 @@ export type Database = {
       transaction_status: "Pending" | "Completed" | "Failed" | "Rejected"
       transaction_type: "Deposit" | "Withdrawal" | "Investment" | "ROI Payout"
       withdrawal_method: "bank" | "crypto"
+      message_target: "all" | "specific"
+      bonus_type: "coupon" | "gift" | "token" | "bonus"
+      fine_type: "fine" | "fee"
+      approval_status: "pending" | "approved" | "rejected"
+      input_type: "code" | "token" | "key"
     }
     CompositeTypes: {
       [_ in never]: never

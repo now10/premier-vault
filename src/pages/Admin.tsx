@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { sendNotification, type PaymentMethod } from '@/lib/notifications';
 import { useTranslation } from 'react-i18next';
 
-type Tab = 'deposits' | 'withdrawals' | 'notifications' | 'popups' | 'methods';
+type Tab = 'deposits' | 'withdrawals' | 'notifications' | 'popups' | 'methods' | 'messages' | 'bonuses' | 'fines' | 'approvals';
 
 export default function Admin() {
   const { user, isAdmin, isLoading } = useAuth();
@@ -34,6 +34,12 @@ export default function Admin() {
   const [popupTitle, setPopupTitle] = useState('');
   const [popupMessage, setPopupMessage] = useState('');
   const [popupFee, setPopupFee] = useState<string>('');
+
+  // New states for forms
+  const [messageForm, setMessageForm] = useState({ title: '', message: '', target: 'all', autoClear: 0, hasButton: false, buttonText: '', targetUser: '' });
+  const [bonusForm, setBonusForm] = useState({ type: 'bonus', amount: 0, description: '', target: 'all', expiry: 30, requireConfirm: false, targetUser: '' });
+  const [fineForm, setFineForm] = useState({ type: 'fine', amount: 0, reason: '', targetUser: '', requirePayment: false });
+  const [approvalForm, setApprovalForm] = useState({ purpose: '', targetUser: '', inputType: 'code' });
 
   const loadData = async () => {
     const [d, w, p, m] = await Promise.all([
@@ -136,6 +142,66 @@ export default function Admin() {
     setBusy(null);
   };
 
+  const sendMessage = async () => {
+    if (!messageForm.title || !messageForm.message) return;
+    await supabase.from('admin_messages').insert({
+      title: messageForm.title,
+      message: messageForm.message,
+      target: messageForm.target,
+      target_user_id: messageForm.target === 'specific' ? messageForm.targetUser : null,
+      auto_clear_seconds: messageForm.autoClear || null,
+      has_button: messageForm.hasButton,
+      button_text: messageForm.hasButton ? messageForm.buttonText : null,
+      sent_by: user!.id
+    });
+    setMessageForm({ title: '', message: '', target: 'all', autoClear: 0, hasButton: false, buttonText: '', targetUser: '' });
+    toast({ title: 'Message sent successfully' });
+  };
+
+  const sendBonus = async () => {
+    if (!bonusForm.description) return;
+    const expiresAt = bonusForm.expiry > 0 ? new Date(Date.now() + bonusForm.expiry * 24 * 60 * 60 * 1000).toISOString() : null;
+    await supabase.from('bonuses').insert({
+      type: bonusForm.type,
+      amount: bonusForm.amount || null,
+      description: bonusForm.description,
+      target: bonusForm.target,
+      target_user_id: bonusForm.target === 'specific' ? bonusForm.targetUser : null,
+      expiry_days: bonusForm.expiry || null,
+      require_confirmation: bonusForm.requireConfirm,
+      expires_at: expiresAt,
+      sent_by: user!.id
+    });
+    setBonusForm({ type: 'bonus', amount: 0, description: '', target: 'all', expiry: 30, requireConfirm: false, targetUser: '' });
+    toast({ title: 'Bonus sent successfully' });
+  };
+
+  const sendFine = async () => {
+    if (!fineForm.reason || !fineForm.targetUser) return;
+    await supabase.from('fines').insert({
+      type: fineForm.type,
+      amount: fineForm.amount,
+      reason: fineForm.reason,
+      target_user_id: fineForm.targetUser,
+      require_payment: fineForm.requirePayment,
+      sent_by: user!.id
+    });
+    setFineForm({ type: 'fine', amount: 0, reason: '', targetUser: '', requirePayment: false });
+    toast({ title: 'Fine/Fee sent successfully' });
+  };
+
+  const sendApprovalRequest = async () => {
+    if (!approvalForm.purpose || !approvalForm.targetUser) return;
+    await supabase.from('approval_requests').insert({
+      purpose: approvalForm.purpose,
+      target_user_id: approvalForm.targetUser,
+      input_type: approvalForm.inputType,
+      sent_by: user!.id
+    });
+    setApprovalForm({ purpose: '', targetUser: '', inputType: 'code' });
+    toast({ title: 'Approval request sent successfully' });
+  };
+
   const handleSendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) {
       toast({ title: 'Missing fields', description: 'Title and message are required.', variant: 'destructive' });
@@ -210,6 +276,10 @@ export default function Admin() {
           ['notifications', t('admin.tabs.notifications'), Bell],
           ['popups', t('admin.tabs.popups'), MessageSquareWarning],
           ['methods', t('admin.tabs.methods'), ShieldCheck],
+          ['messages', 'Messages', Send],
+          ['bonuses', 'Bonuses', Bell],
+          ['fines', 'Fines', MessageSquareWarning],
+          ['approvals', 'Approvals', ShieldCheck],
         ] as const).map(([key, label, Icon]) => (
           <button
             key={key}
@@ -472,6 +542,203 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'messages' && (
+        <div className="glass-card p-6">
+          <h2 className="text-xl font-semibold mb-4">Send Message</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
+            <div>
+              <label className="block text-sm font-medium mb-1">Title</label>
+              <input type="text" className="input-dark w-full" placeholder="Message title" value={messageForm.title} onChange={(e) => setMessageForm({...messageForm, title: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Message</label>
+              <textarea className="input-dark w-full h-24" placeholder="Message content" value={messageForm.message} onChange={(e) => setMessageForm({...messageForm, message: e.target.value})}></textarea>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Target</label>
+                <select className="input-dark w-full" value={messageForm.target} onChange={(e) => setMessageForm({...messageForm, target: e.target.value})}>
+                  <option value="all">All Users</option>
+                  <option value="specific">Specific User</option>
+                </select>
+              </div>
+              {messageForm.target === 'specific' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Select User</label>
+                  <select className="input-dark w-full" value={messageForm.targetUser} onChange={(e) => setMessageForm({...messageForm, targetUser: e.target.value})}>
+                    <option value="">Select User</option>
+                    {Object.values(profilesMap).map((prof: any) => (
+                      <option key={prof.id} value={prof.id}>{prof.full_name} ({prof.email})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">Auto Clear (seconds)</label>
+                <input type="number" className="input-dark w-full" placeholder="0 for no auto clear" value={messageForm.autoClear} onChange={(e) => setMessageForm({...messageForm, autoClear: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={messageForm.hasButton} onChange={(e) => setMessageForm({...messageForm, hasButton: e.target.checked})} />
+                <span className="text-sm">Include Button</span>
+              </label>
+            </div>
+            {messageForm.hasButton && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Button Text</label>
+                <input type="text" className="input-dark w-full" placeholder="Button text" value={messageForm.buttonText} onChange={(e) => setMessageForm({...messageForm, buttonText: e.target.value})} />
+              </div>
+            )}
+            <button type="submit" className="gradient-gold text-primary-foreground px-6 py-2 rounded-lg font-medium">
+              Send Message
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'bonuses' && (
+        <div className="glass-card p-6">
+          <h2 className="text-xl font-semibold mb-4">Send Bonus</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); sendBonus(); }}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type</label>
+                <select className="input-dark w-full" value={bonusForm.type} onChange={(e) => setBonusForm({...bonusForm, type: e.target.value})}>
+                  <option value="coupon">Coupon Code</option>
+                  <option value="gift">Gift</option>
+                  <option value="token">Token</option>
+                  <option value="bonus">Bonus</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount/Value</label>
+                <input type="number" className="input-dark w-full" placeholder="Amount" value={bonusForm.amount} onChange={(e) => setBonusForm({...bonusForm, amount: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea className="input-dark w-full h-24" placeholder="Bonus description" value={bonusForm.description} onChange={(e) => setBonusForm({...bonusForm, description: e.target.value})}></textarea>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Target</label>
+                <select className="input-dark w-full" value={bonusForm.target} onChange={(e) => setBonusForm({...bonusForm, target: e.target.value})}>
+                  <option value="all">All Users</option>
+                  <option value="specific">Specific User</option>
+                </select>
+              </div>
+              {bonusForm.target === 'specific' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Select User</label>
+                  <select className="input-dark w-full" value={bonusForm.targetUser} onChange={(e) => setBonusForm({...bonusForm, targetUser: e.target.value})}>
+                    <option value="">Select User</option>
+                    {Object.values(profilesMap).map((prof: any) => (
+                      <option key={prof.id} value={prof.id}>{prof.full_name} ({prof.email})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">Expiry (days)</label>
+                <input type="number" className="input-dark w-full" placeholder="Expiry in days" value={bonusForm.expiry} onChange={(e) => setBonusForm({...bonusForm, expiry: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={bonusForm.requireConfirm} onChange={(e) => setBonusForm({...bonusForm, requireConfirm: e.target.checked})} />
+                <span className="text-sm">Require Confirmation</span>
+              </label>
+            </div>
+            <button type="submit" className="gradient-gold text-primary-foreground px-6 py-2 rounded-lg font-medium">
+              Send Bonus
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'fines' && (
+        <div className="glass-card p-6">
+          <h2 className="text-xl font-semibold mb-4">Send Fine/Fee</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); sendFine(); }}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type</label>
+                <select className="input-dark w-full" value={fineForm.type} onChange={(e) => setFineForm({...fineForm, type: e.target.value})}>
+                  <option value="fine">Fine</option>
+                  <option value="fee">Fee</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount</label>
+                <input type="number" className="input-dark w-full" placeholder="Amount" value={fineForm.amount} onChange={(e) => setFineForm({...fineForm, amount: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Reason</label>
+              <textarea className="input-dark w-full h-24" placeholder="Reason for fine/fee" value={fineForm.reason} onChange={(e) => setFineForm({...fineForm, reason: e.target.value})}></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Target User</label>
+              <select className="input-dark w-full" value={fineForm.targetUser} onChange={(e) => setFineForm({...fineForm, targetUser: e.target.value})}>
+                <option value="">Select User</option>
+                {Object.values(profilesMap).map((prof: any) => (
+                  <option key={prof.id} value={prof.id}>{prof.full_name} ({prof.email})</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={fineForm.requirePayment} onChange={(e) => setFineForm({...fineForm, requirePayment: e.target.checked})} />
+                <span className="text-sm">Require Payment</span>
+              </label>
+            </div>
+            <button type="submit" className="gradient-gold text-primary-foreground px-6 py-2 rounded-lg font-medium">
+              Send Fine/Fee
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'approvals' && (
+        <div className="glass-card p-6">
+          <h2 className="text-xl font-semibold mb-4">Send Approval Request</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); sendApprovalRequest(); }}>
+            <div>
+              <label className="block text-sm font-medium mb-1">Purpose</label>
+              <input type="text" className="input-dark w-full" placeholder="e.g., Upgrade to Premium" value={approvalForm.purpose} onChange={(e) => setApprovalForm({...approvalForm, purpose: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Target User</label>
+              <select className="input-dark w-full" value={approvalForm.targetUser} onChange={(e) => setApprovalForm({...approvalForm, targetUser: e.target.value})}>
+                <option value="">Select User</option>
+                {Object.values(profilesMap).map((prof: any) => (
+                  <option key={prof.id} value={prof.id}>{prof.full_name} ({prof.email})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Required Input</label>
+              <select className="input-dark w-full" value={approvalForm.inputType} onChange={(e) => setApprovalForm({...approvalForm, inputType: e.target.value})}>
+                <option value="code">Code</option>
+                <option value="token">Token</option>
+                <option value="key">Key</option>
+              </select>
+            </div>
+            <button type="submit" className="gradient-gold text-primary-foreground px-6 py-2 rounded-lg font-medium">
+              Send Approval Request
+            </button>
+          </form>
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-2">Pending Approvals</h3>
+            <div className="text-muted-foreground">No pending approvals (placeholder)</div>
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}
