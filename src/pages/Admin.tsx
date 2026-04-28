@@ -257,7 +257,7 @@ export default function Admin() {
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending');
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div key={tab} className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-7 h-7 text-primary" />
         <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{t('admin.panel')}</h1>
@@ -283,7 +283,7 @@ export default function Admin() {
         ] as const).map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => setTab(key as Tab)}
             className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${tab === key ? 'gradient-gold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
             <Icon className="w-4 h-4" />
