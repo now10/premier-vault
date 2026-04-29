@@ -233,12 +233,25 @@ export default function Admin() {
 
   const sendApprovalRequest = async () => {
     if (!approvalForm.purpose || !approvalForm.targetUser) return;
+    
+    // Insert approval request
     await supabase.from('approval_requests').insert({
       purpose: approvalForm.purpose,
       target_user_id: approvalForm.targetUser,
       input_type: approvalForm.inputType,
       sent_by: user!.id
     });
+
+    // Create notification for the approval request
+    await supabase.from('notifications').insert({
+      user_id: approvalForm.targetUser,
+      title: `🔐 Approval Request: ${approvalForm.purpose}`,
+      message: `You have a new approval request that requires your ${approvalForm.inputType}. Please check your dashboard for details.`,
+      type: 'info',
+      force_popup: true,
+      created_by: user!.id
+    });
+    
     setApprovalForm({ purpose: '', targetUser: '', inputType: 'code' });
     toast({ title: 'Approval request sent successfully' });
   };
