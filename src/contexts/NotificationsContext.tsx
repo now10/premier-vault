@@ -40,16 +40,33 @@ export interface BonusPopup {
   created_at: string;
 }
 
+export interface BillPopup {
+  id: string;
+  title: string;
+  description: string;
+  amount: number;
+  reason: string;
+  target_user_id: string;
+  paid: boolean;
+  paid_at: string | null;
+  payment_method: string | null;
+  sent_by: string;
+  created_at: string;
+  expires_at: string | null;
+}
+
 interface Ctx {
   notifications: AppNotification[];
   unreadCount: number;
   pendingPopup: AppNotification | null;
   pendingWithdrawalPopup: WithdrawalPopup | null;
   pendingBonusPopup: BonusPopup | null;
+  pendingBill: BillPopup | null;
   refresh: () => Promise<void>;
   acknowledgePopup: (id: string) => Promise<void>;
   acknowledgeWithdrawalPopup: (id: string) => Promise<void>;
   acknowledgeBonusPopup: (id: string) => Promise<void>;
+  acknowledgeBill: (id: string) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
 }
@@ -62,6 +79,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [pendingPopup, setPendingPopup] = useState<AppNotification | null>(null);
   const [pendingWithdrawalPopup, setPendingWithdrawalPopup] = useState<WithdrawalPopup | null>(null);
   const [pendingBonusPopup, setPendingBonusPopup] = useState<BonusPopup | null>(null);
+  const [pendingBill, setPendingBill] = useState<BillPopup | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -71,7 +89,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       setPendingBonusPopup(null);
       return;
     }
-    const [{ data: notifs }, { data: popup }, { data: bonus }] = await Promise.all([
+    const [{ data: notifs }, { data: popup }, { data: bonus }, { data: bill }] = await Promise.all([
       supabase
         .from('notifications')
         .select('*')
@@ -94,6 +112,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('bills')
+        .select('*')
+        .eq('target_user_id', user.id)
+        .eq('paid', false)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
     ]);
     const list = (notifs ?? []) as AppNotification[];
     setNotifications(list);
@@ -101,6 +127,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setPendingPopup(forced ?? null);
     setPendingWithdrawalPopup((popup ?? null) as WithdrawalPopup | null);
     setPendingBonusPopup((bonus ?? null) as BonusPopup | null);
+    setPendingBill((bill ?? null) as BillPopup | null);
   }, [user]);
 
   useEffect(() => {
@@ -111,6 +138,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_popups', filter: `user_id=eq.${user.id}` }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bonuses', filter: `target_user_id=eq.${user.id}` }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bills', filter: `target_user_id=eq.${user.id}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -135,6 +163,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     refresh();
   };
 
+  const acknowledgeBill = async (id: string) => {
+    // User clicked "Remind Later" or dismisses bill; keep bill row intact (still unpaid)
+    setPendingBill(null);
+    refresh();
+  };
+
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
     refresh();
@@ -150,7 +184,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotificationsContext.Provider
-      value={{ notifications, unreadCount, pendingPopup, pendingWithdrawalPopup, pendingBonusPopup, refresh, acknowledgePopup, acknowledgeWithdrawalPopup, acknowledgeBonusPopup, markAsRead, markAllAsRead }}
+      value={{ notifications, unreadCount, pendingPopup, pendingWithdrawalPopup, pendingBonusPopup, pendingBill, refresh, acknowledgePopup, acknowledgeWithdrawalPopup, acknowledgeBonusPopup, acknowledgeBill, markAsRead, markAllAsRead }}
     >
       {children}
     </NotificationsContext.Provider>

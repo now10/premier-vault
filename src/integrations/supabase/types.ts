@@ -668,6 +668,51 @@ export type Database = {
         }
         Relationships: []
       }
+      bills: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          amount: number
+          reason: string
+          target_user_id: string
+          paid: boolean
+          paid_at: string | null
+          payment_method: string | null
+          sent_by: string
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          description: string
+          amount: number
+          reason: string
+          target_user_id: string
+          paid?: boolean
+          paid_at?: string | null
+          payment_method?: string | null
+          sent_by: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          amount?: number
+          reason?: string
+          target_user_id?: string
+          paid?: boolean
+          paid_at?: string | null
+          payment_method?: string | null
+          sent_by?: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Relationships: []
+      }
       withdrawal_details: {
         Row: {
           account_name: string | null

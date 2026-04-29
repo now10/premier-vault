@@ -7,6 +7,7 @@ import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import ForcedPopupModal from "@/components/notifications/ForcedPopupModal";
 import WithdrawalPopupModal from "@/components/notifications/WithdrawalPopupModal";
 import BonusPopupModal from "@/components/notifications/BonusPopupModal";
+import BillPopupModal from "@/components/notifications/BillPopupModal";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -31,6 +32,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <ForcedPopupModal />
       <WithdrawalPopupModal />
       <BonusPopupModal />
+        <BillPopupModal />
     </NotificationsProvider>
   );
 }

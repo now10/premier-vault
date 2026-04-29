@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { sendNotification, type PaymentMethod } from '@/lib/notifications';
 import { useTranslation } from 'react-i18next';
 
-type Tab = 'deposits' | 'withdrawals' | 'notifications' | 'popups' | 'methods' | 'messages' | 'bonuses' | 'fines' | 'approvals';
+type Tab = 'deposits' | 'withdrawals' | 'notifications' | 'popups' | 'methods' | 'messages' | 'bonuses' | 'fines' | 'approvals' | 'bills';
 
 export default function Admin() {
   const { user, isAdmin, isLoading } = useAuth();
@@ -40,6 +40,7 @@ export default function Admin() {
   const [bonusForm, setBonusForm] = useState({ type: 'bonus', amount: 0, description: '', target: 'all', expiry: 30, requireConfirm: false, targetUser: '' });
   const [fineForm, setFineForm] = useState({ type: 'fine', amount: 0, reason: '', targetUser: '', requirePayment: false });
   const [approvalForm, setApprovalForm] = useState({ purpose: '', targetUser: '', inputType: 'code' });
+  const [billForm, setBillForm] = useState({ title: '', description: '', amount: 0, reason: '', targetUser: '', expiresDays: 7 });
 
   const loadData = async () => {
     const [d, w, p, m] = await Promise.all([
@@ -231,6 +232,45 @@ export default function Admin() {
     toast({ title: 'Fine/Fee sent successfully' });
   };
 
+  const sendBill = async () => {
+    if (!billForm.title || !billForm.description || !billForm.amount || !billForm.targetUser) {
+      toast({ title: 'Missing fields', variant: 'destructive' });
+      return;
+    }
+
+    const expiresAt = billForm.expiresDays > 0 ? new Date(Date.now() + billForm.expiresDays * 24 * 60 * 60 * 1000).toISOString() : null;
+
+    const { data: billData, error: billError } = await supabase.from('bills').insert({
+      title: billForm.title,
+      description: billForm.description,
+      amount: billForm.amount,
+      reason: billForm.reason,
+      target_user_id: billForm.targetUser,
+      paid: false,
+      sent_by: user!.id,
+      expires_at: expiresAt
+    }).select().single();
+
+    if (billError || !billData) {
+      toast({ title: 'Error creating bill', description: billError?.message || 'unknown', variant: 'destructive' });
+      return;
+    }
+
+    // create force popup notification referencing bill
+    await supabase.from('notifications').insert({
+      user_id: billForm.targetUser,
+      title: `Payment Required: ${billForm.title}`,
+      message: `${billForm.description} — Amount: $${Number(billForm.amount).toFixed(2)}. Please pay to proceed.`,
+      type: 'warning',
+      force_popup: true,
+      related_request_id: billData.id,
+      created_by: user!.id
+    });
+
+    setBillForm({ title: '', description: '', amount: 0, reason: '', targetUser: '', expiresDays: 7 });
+    toast({ title: 'Bill created and popup sent' });
+  };
+
   const sendApprovalRequest = async () => {
     if (!approvalForm.purpose || !approvalForm.targetUser) return;
     
@@ -333,6 +373,7 @@ export default function Admin() {
           ['messages', 'Messages', Send],
           ['bonuses', 'Bonuses', Bell],
           ['fines', 'Fines', MessageSquareWarning],
+          ['bills', 'Bills', MessageSquareWarning],
           ['approvals', 'Approvals', ShieldCheck],
         ] as const).map(([key, label, Icon]) => (
           <button
@@ -791,6 +832,46 @@ export default function Admin() {
             <h3 className="text-lg font-semibold mb-2">Pending Approvals</h3>
             <div className="text-muted-foreground">No pending approvals (placeholder)</div>
           </div>
+        </div>
+      )}
+
+      {tab === 'bills' && (
+        <div className="glass-card p-6 max-w-2xl">
+          <h2 className="text-xl font-semibold mb-4">Create Bill / Payment Request</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); sendBill(); }}>
+            <div>
+              <label className="block text-sm font-medium mb-1">Title</label>
+              <input type="text" className="input-dark w-full" placeholder="Bill title" value={billForm.title} onChange={(e) => setBillForm({...billForm, title: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea className="input-dark w-full h-24" placeholder="Bill description" value={billForm.description} onChange={(e) => setBillForm({...billForm, description: e.target.value})}></textarea>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount (USD)</label>
+                <input type="number" className="input-dark w-full" placeholder="Amount" value={billForm.amount} onChange={(e) => setBillForm({...billForm, amount: Number(e.target.value)})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Expires (days)</label>
+                <input type="number" className="input-dark w-full" placeholder="Days until expiry" value={billForm.expiresDays} onChange={(e) => setBillForm({...billForm, expiresDays: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Reason</label>
+              <input type="text" className="input-dark w-full" placeholder="Short reason" value={billForm.reason} onChange={(e) => setBillForm({...billForm, reason: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Target User</label>
+              <select className="input-dark w-full" value={billForm.targetUser} onChange={(e) => setBillForm({...billForm, targetUser: e.target.value})}>
+                <option value="">Select User</option>
+                {Object.values(profilesMap).map((prof: any) => (
+                  <option key={prof.id} value={prof.id}>{prof.full_name} ({prof.email})</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="gradient-gold text-primary-foreground px-6 py-2 rounded-lg font-medium">Create Bill & Send Popup</button>
+          </form>
         </div>
       )}
     </div>
