@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import NotificationsBell from '@/components/notifications/NotificationsBell';
+import GlobalNotificationDisplay from '@/components/notifications/GlobalNotificationDisplay';
 import {
   LayoutDashboard, TrendingUp, CreditCard, History, Settings, LogOut, Menu, ShieldCheck,
 } from 'lucide-react';
@@ -97,6 +98,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-4 lg:p-8 overflow-auto">
           {children}
         </main>
+        
+        <GlobalNotificationDisplay />
       </div>
     </div>
   );
