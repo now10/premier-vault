@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import ForcedPopupModal from "@/components/notifications/ForcedPopupModal";
 import WithdrawalPopupModal from "@/components/notifications/WithdrawalPopupModal";
+import BonusPopupModal from "@/components/notifications/BonusPopupModal";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -29,6 +30,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <AppLayout>{children}</AppLayout>
       <ForcedPopupModal />
       <WithdrawalPopupModal />
+      <BonusPopupModal />
     </NotificationsProvider>
   );
 }

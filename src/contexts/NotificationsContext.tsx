@@ -26,14 +26,30 @@ export interface WithdrawalPopup {
   created_at: string;
 }
 
+export interface BonusPopup {
+  id: string;
+  type: 'coupon' | 'gift' | 'token' | 'bonus';
+  amount: number | null;
+  description: string;
+  message: string;
+  target_user_id: string | null;
+  expires_at: string | null;
+  claimed: boolean;
+  claimed_at: string | null;
+  required_confirmation: boolean;
+  created_at: string;
+}
+
 interface Ctx {
   notifications: AppNotification[];
   unreadCount: number;
   pendingPopup: AppNotification | null;
   pendingWithdrawalPopup: WithdrawalPopup | null;
+  pendingBonusPopup: BonusPopup | null;
   refresh: () => Promise<void>;
   acknowledgePopup: (id: string) => Promise<void>;
   acknowledgeWithdrawalPopup: (id: string) => Promise<void>;
+  acknowledgeBonusPopup: (id: string) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
 }
@@ -45,15 +61,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [pendingPopup, setPendingPopup] = useState<AppNotification | null>(null);
   const [pendingWithdrawalPopup, setPendingWithdrawalPopup] = useState<WithdrawalPopup | null>(null);
+  const [pendingBonusPopup, setPendingBonusPopup] = useState<BonusPopup | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user) {
       setNotifications([]);
       setPendingPopup(null);
       setPendingWithdrawalPopup(null);
+      setPendingBonusPopup(null);
       return;
     }
-    const [{ data: notifs }, { data: popup }] = await Promise.all([
+    const [{ data: notifs }, { data: popup }, { data: bonus }] = await Promise.all([
       supabase
         .from('notifications')
         .select('*')
@@ -68,12 +86,21 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('bonuses')
+        .select('*')
+        .or(`target_user_id.eq.${user.id},target_user_id.is.null`)
+        .eq('claimed', false)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
     ]);
     const list = (notifs ?? []) as AppNotification[];
     setNotifications(list);
     const forced = list.find((n) => n.force_popup && !n.read && n.user_id === user.id);
     setPendingPopup(forced ?? null);
     setPendingWithdrawalPopup((popup ?? null) as WithdrawalPopup | null);
+    setPendingBonusPopup((bonus ?? null) as BonusPopup | null);
   }, [user]);
 
   useEffect(() => {
@@ -83,6 +110,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       .channel(`notif-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_popups', filter: `user_id=eq.${user.id}` }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonuses', filter: `target_user_id=eq.${user.id}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -101,6 +129,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     refresh();
   };
 
+  const acknowledgeBonusPopup = async (id: string) => {
+    // Mark as acknowledged but not claimed (user clicked "Later")
+    setPendingBonusPopup(null);
+    refresh();
+  };
+
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
     refresh();
@@ -116,7 +150,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotificationsContext.Provider
-      value={{ notifications, unreadCount, pendingPopup, pendingWithdrawalPopup, refresh, acknowledgePopup, acknowledgeWithdrawalPopup, markAsRead, markAllAsRead }}
+      value={{ notifications, unreadCount, pendingPopup, pendingWithdrawalPopup, pendingBonusPopup, refresh, acknowledgePopup, acknowledgeWithdrawalPopup, acknowledgeBonusPopup, markAsRead, markAllAsRead }}
     >
       {children}
     </NotificationsContext.Provider>

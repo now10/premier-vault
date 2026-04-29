@@ -144,6 +144,8 @@ export default function Admin() {
 
   const sendMessage = async () => {
     if (!messageForm.title || !messageForm.message) return;
+    
+    // Insert message
     await supabase.from('admin_messages').insert({
       title: messageForm.title,
       message: messageForm.message,
@@ -154,6 +156,22 @@ export default function Admin() {
       button_text: messageForm.hasButton ? messageForm.buttonText : null,
       sent_by: user!.id
     });
+
+    // Also create notifications for users
+    const targetUsers = messageForm.target === 'specific' ? [messageForm.targetUser] : 
+                       messageForm.target === 'all' ? (profiles.map(p => p.id)) : [];
+    
+    for (const userId of targetUsers) {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        title: messageForm.title,
+        message: messageForm.message,
+        type: 'info',
+        force_popup: true,
+        created_by: user!.id
+      });
+    }
+    
     setMessageForm({ title: '', message: '', target: 'all', autoClear: 0, hasButton: false, buttonText: '', targetUser: '' });
     toast({ title: 'Message sent successfully' });
   };
@@ -161,17 +179,40 @@ export default function Admin() {
   const sendBonus = async () => {
     if (!bonusForm.description) return;
     const expiresAt = bonusForm.expiry > 0 ? new Date(Date.now() + bonusForm.expiry * 24 * 60 * 60 * 1000).toISOString() : null;
-    await supabase.from('bonuses').insert({
+    
+    // Insert bonus
+    const { data: bonusData, error: bonusError } = await supabase.from('bonuses').insert({
       type: bonusForm.type,
       amount: bonusForm.amount || null,
       description: bonusForm.description,
+      message: `You've received a ${bonusForm.type}: ${bonusForm.description}${bonusForm.amount ? ` for $${bonusForm.amount}` : ''}`,
       target: bonusForm.target,
       target_user_id: bonusForm.target === 'specific' ? bonusForm.targetUser : null,
       expiry_days: bonusForm.expiry || null,
       require_confirmation: bonusForm.requireConfirm,
       expires_at: expiresAt,
-      sent_by: user!.id
-    });
+      sent_by: user!.id,
+      claimed: false
+    }).select().single();
+
+    if (!bonusError && bonusData) {
+      // Also create a notification popup for the bonus
+      const targetUsers = bonusForm.target === 'specific' ? [bonusForm.targetUser] : 
+                         bonusForm.target === 'all' ? (profiles.map(p => p.id)) : [];
+      
+      for (const userId of targetUsers) {
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          title: `🎁 ${bonusForm.type === 'coupon' ? 'Coupon' : bonusForm.type === 'gift' ? 'Gift' : bonusForm.type === 'token' ? 'Token' : 'Bonus'}: ${bonusForm.description}`,
+          message: `You've received a ${bonusForm.type}${bonusForm.amount ? ` worth $${bonusForm.amount}` : ''}. Claim it now!`,
+          type: 'success',
+          force_popup: true,
+          related_request_id: bonusData.id,
+          created_by: user!.id
+        });
+      }
+    }
+    
     setBonusForm({ type: 'bonus', amount: 0, description: '', target: 'all', expiry: 30, requireConfirm: false, targetUser: '' });
     toast({ title: 'Bonus sent successfully' });
   };

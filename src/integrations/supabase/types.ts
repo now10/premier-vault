@@ -542,6 +542,7 @@ export type Database = {
           type: Database["public"]["Enums"]["bonus_type"]
           amount: number | null
           description: string
+          message: string
           target: Database["public"]["Enums"]["message_target"]
           target_user_id: string | null
           expiry_days: number | null
@@ -550,12 +551,16 @@ export type Database = {
           sent_by: string
           created_at: string
           expires_at: string | null
+          claimed: boolean
+          claimed_at: string | null
+          claimed_by: string | null
         }
         Insert: {
           id?: string
           type: Database["public"]["Enums"]["bonus_type"]
           amount?: number | null
           description: string
+          message?: string
           target?: Database["public"]["Enums"]["message_target"]
           target_user_id?: string | null
           expiry_days?: number | null
@@ -564,12 +569,16 @@ export type Database = {
           sent_by: string
           created_at?: string
           expires_at?: string | null
+          claimed?: boolean
+          claimed_at?: string | null
+          claimed_by?: string | null
         }
         Update: {
           id?: string
           type?: Database["public"]["Enums"]["bonus_type"]
           amount?: number | null
           description?: string
+          message?: string
           target?: Database["public"]["Enums"]["message_target"]
           target_user_id?: string | null
           expiry_days?: number | null
@@ -578,6 +587,9 @@ export type Database = {
           sent_by?: string
           created_at?: string
           expires_at?: string | null
+          claimed?: boolean
+          claimed_at?: string | null
+          claimed_by?: string | null
         }
         Relationships: []
       }
