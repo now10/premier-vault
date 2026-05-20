@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_requests: {
+        Row: {
+          created_at: string
+          id: string
+          input_type: string
+          purpose: string
+          resolved_at: string | null
+          response: string | null
+          sent_by: string | null
+          status: string
+          target_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_type?: string
+          purpose: string
+          resolved_at?: string | null
+          response?: string | null
+          sent_by?: string | null
+          status?: string
+          target_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_type?: string
+          purpose?: string
+          resolved_at?: string | null
+          response?: string | null
+          sent_by?: string | null
+          status?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           amount: number
