@@ -14,6 +14,180 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_messages: {
+        Row: {
+          auto_clear_seconds: number | null
+          button_text: string | null
+          created_at: string
+          has_button: boolean
+          id: string
+          message: string
+          sent_by: string | null
+          target: string
+          target_user_id: string | null
+          title: string
+        }
+        Insert: {
+          auto_clear_seconds?: number | null
+          button_text?: string | null
+          created_at?: string
+          has_button?: boolean
+          id?: string
+          message: string
+          sent_by?: string | null
+          target?: string
+          target_user_id?: string | null
+          title: string
+        }
+        Update: {
+          auto_clear_seconds?: number | null
+          button_text?: string | null
+          created_at?: string
+          has_button?: boolean
+          id?: string
+          message?: string
+          sent_by?: string | null
+          target?: string
+          target_user_id?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      approval_requests: {
+        Row: {
+          created_at: string
+          id: string
+          input_type: string
+          purpose: string
+          resolved_at: string | null
+          response: string | null
+          sent_by: string | null
+          status: string
+          target_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_type?: string
+          purpose: string
+          resolved_at?: string | null
+          response?: string | null
+          sent_by?: string | null
+          status?: string
+          target_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_type?: string
+          purpose?: string
+          resolved_at?: string | null
+          response?: string | null
+          sent_by?: string | null
+          status?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
+      bills: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          expires_at: string | null
+          id: string
+          paid: boolean
+          paid_at: string | null
+          payment_method: string | null
+          reason: string | null
+          sent_by: string | null
+          target_user_id: string
+          title: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          payment_method?: string | null
+          reason?: string | null
+          sent_by?: string | null
+          target_user_id: string
+          title: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          payment_method?: string | null
+          reason?: string | null
+          sent_by?: string | null
+          target_user_id?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      bonuses: {
+        Row: {
+          amount: number | null
+          claimed: boolean
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          description: string
+          expires_at: string | null
+          expiry_days: number | null
+          id: string
+          message: string | null
+          require_confirmation: boolean
+          sent_by: string | null
+          target: string
+          target_user_id: string | null
+          type: string
+        }
+        Insert: {
+          amount?: number | null
+          claimed?: boolean
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          expiry_days?: number | null
+          id?: string
+          message?: string | null
+          require_confirmation?: boolean
+          sent_by?: string | null
+          target?: string
+          target_user_id?: string | null
+          type?: string
+        }
+        Update: {
+          amount?: number | null
+          claimed?: boolean
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          expiry_days?: number | null
+          id?: string
+          message?: string | null
+          require_confirmation?: boolean
+          sent_by?: string | null
+          target?: string
+          target_user_id?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
       deposit_requests: {
         Row: {
           admin_note: string | null
@@ -75,6 +249,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fines: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          reason: string
+          require_payment: boolean
+          sent_by: string | null
+          target_user_id: string
+          type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          reason: string
+          require_payment?: boolean
+          sent_by?: string | null
+          target_user_id: string
+          type?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          reason?: string
+          require_payment?: boolean
+          sent_by?: string | null
+          target_user_id?: string
+          type?: string
+        }
+        Relationships: []
       }
       investment_plans: {
         Row: {
@@ -423,7 +630,7 @@ export type Database = {
           description?: string | null
           fee?: number
           id?: string
-          reference: string
+          reference?: string
           related_request_id?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
           type: Database["public"]["Enums"]["transaction_type"]
@@ -663,7 +870,13 @@ export type Database = {
       investment_status: "Active" | "Matured" | "Cancelled"
       request_status: "Pending" | "Approved" | "Rejected" | "Completed"
       transaction_status: "Pending" | "Completed" | "Failed" | "Rejected"
-      transaction_type: "Deposit" | "Withdrawal" | "Investment" | "ROI Payout"
+      transaction_type:
+        | "Deposit"
+        | "Withdrawal"
+        | "Investment"
+        | "ROI Payout"
+        | "Bonus"
+        | "Payment"
       withdrawal_method: "bank" | "crypto"
     }
     CompositeTypes: {
@@ -796,7 +1009,14 @@ export const Constants = {
       investment_status: ["Active", "Matured", "Cancelled"],
       request_status: ["Pending", "Approved", "Rejected", "Completed"],
       transaction_status: ["Pending", "Completed", "Failed", "Rejected"],
-      transaction_type: ["Deposit", "Withdrawal", "Investment", "ROI Payout"],
+      transaction_type: [
+        "Deposit",
+        "Withdrawal",
+        "Investment",
+        "ROI Payout",
+        "Bonus",
+        "Payment",
+      ],
       withdrawal_method: ["bank", "crypto"],
     },
   },

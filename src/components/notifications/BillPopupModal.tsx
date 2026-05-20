@@ -54,7 +54,6 @@ export default function BillPopupModal() {
         user_id: user.id,
         type: 'Payment',
         amount: billAmount,
-        currency: 'USD',
         status: 'Completed',
         description: `Bill payment: ${bill.title} - ${bill.description}`,
       });

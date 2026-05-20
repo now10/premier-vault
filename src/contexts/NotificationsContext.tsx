@@ -36,7 +36,7 @@ export interface BonusPopup {
   expires_at: string | null;
   claimed: boolean;
   claimed_at: string | null;
-  required_confirmation: boolean;
+  require_confirmation: boolean;
   created_at: string;
 }
 

@@ -41,7 +41,6 @@ export default function BonusPopupModal() {
         user_id: user.id,
         type: 'Bonus',
         amount: b.amount || 0,
-        currency: 'USD',
         status: 'Completed',
         description: `${b.type === 'coupon' ? 'Coupon' : b.type === 'gift' ? 'Gift' : b.type === 'token' ? 'Token' : 'Bonus'}: ${b.description}`,
       });
