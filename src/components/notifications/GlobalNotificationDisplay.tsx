@@ -35,7 +35,6 @@ export default function GlobalNotificationDisplay() {
         user_id: user.id,
         type: 'Bonus',
         amount: amount || 0,
-        currency: 'USD',
         status: 'Completed',
         description: `Bonus claimed and credited to wallet`,
       });
